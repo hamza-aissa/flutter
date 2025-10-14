@@ -64,7 +64,19 @@ class _WaitingRoomScreenState extends State<WaitingRoomScreen> {
                 itemCount: _manager.clients.length,
                 itemBuilder: (context, index) {
                   final clientName = _manager.clients[index];
-                  return Card(child: ListTile(title: Text(clientName)));
+                  return Card(
+                    child: ListTile(
+                      title: Text(clientName),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () {
+                          setState(() {
+                            _manager.removeClient(clientName);
+                          });
+                        },
+                      ),
+                    ),
+                  );
                 },
               ),
             ),

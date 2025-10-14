@@ -12,4 +12,16 @@ void main() {
     expect(manager.clients.length, 1);
     expect(manager.clients.first, 'John Doe');
   });
+  // test/waiting_room_manager_test.dart
+  test('should remove a client from the waiting list', () {
+    // ARRANGE
+    final manager = WaitingRoomManager();
+    manager.addClient('John Doe');
+    manager.addClient('Jane Doe');
+    // ACT
+    manager.removeClient('John Doe');
+    // ASSERT
+    expect(manager.clients.length, 1);
+    expect(manager.clients.first, 'Jane Doe');
+  });
 }

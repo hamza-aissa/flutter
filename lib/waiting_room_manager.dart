@@ -5,4 +5,8 @@ class WaitingRoomManager {
   void addClient(String name) {
     _clients.add(name);
   }
+
+  void removeClient(String name) {
+    _clients.remove(name);
+  }
 }

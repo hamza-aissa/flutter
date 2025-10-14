@@ -16,4 +16,22 @@ void main() {
     expect(find.text('Alice'), findsOneWidget);
     expect(find.text('Clients in Queue: 1'), findsOneWidget);
   });
+  testWidgets(
+    'should remove a client from the list when the delete button is tapped',
+    (WidgetTester tester) async {
+      // ARRANGE
+      await tester.pumpWidget(const WaitingRoomApp());
+      await tester.enterText(find.byType(TextField), 'Bob');
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pump();
+      // ACT
+      // Find the delete icon associated with 'Bob' and tap it.
+      await tester.tap(find.byIcon(Icons.delete));
+      await tester.pump();
+
+      // ASSERT
+      expect(find.text('Bob'), findsNothing);
+      expect(find.text('Clients in Queue: 0'), findsOneWidget);
+    },
+  );
 }
