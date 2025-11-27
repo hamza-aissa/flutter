@@ -12,6 +12,30 @@ class SyncService {
     return connectivityResult != ConnectivityResult.none;
   }
 
+  Future<List<String>> syncWaitingRoomsToSupabase() async {
+    if (!await isOnline()) return [];
+
+    final syncedIds = <String>[];
+
+    try {
+      final localRooms = await _sqliteService.getWaitingRooms();
+
+      for (var room in localRooms) {
+        try {
+          await _supabaseService.addWaitingRoom(room);
+          syncedIds.add(room.id);
+          print('Waiting room ${room.id} synced to Supabase');
+        } catch (e) {
+          print('Error syncing waiting room ${room.id}: $e');
+        }
+      }
+    } catch (e) {
+      print('Error during waiting room sync: $e');
+    }
+
+    return syncedIds;
+  }
+
   // Synchroniser les waiting rooms depuis Supabase vers SQLite
   Future<void> syncWaitingRooms() async {
     if (!await isOnline()) return;
@@ -87,6 +111,7 @@ class SyncService {
     if (!await isOnline()) {
       return [];
     }
+    await syncWaitingRoomsToSupabase();
 
     // Sync waiting rooms d'abord
     await syncWaitingRooms();

@@ -18,7 +18,7 @@ class SQLiteService {
 
     return await openDatabase(
       path,
-      version: 2, // ✅ CHANGE 1 → 2 (force la mise à jour)
+      version: 2,
       onCreate: _onCreate,
       onUpgrade: (db, oldVersion, newVersion) async {
         print('🔄 Mise à jour DB: v$oldVersion → v$newVersion');

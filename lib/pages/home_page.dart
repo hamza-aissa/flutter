@@ -71,12 +71,12 @@ class _HomePageState extends State<HomePage> {
 
     try {
       await context.read<ClientProvider>().addClient(
-        _nameController.text.trim(),
-        position,
-      );
+            _nameController.text.trim(),
+            position,
+          );
 
       _nameController.clear();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Client ajouté avec succès ✓')),
@@ -190,7 +190,8 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                        Icon(Icons.people_outline,
+                            size: 64, color: Colors.grey),
                         SizedBox(height: 16),
                         Text(
                           'Aucun client en attente',
@@ -239,12 +240,12 @@ class _HomePageState extends State<HomePage> {
           final testClients = TestDataGenerator.getTestClients();
           for (var testData in testClients) {
             await context.read<ClientProvider>().addClient(
-              testData['name'] as String,
-              testData['position'] as Position,
-            );
+                  testData['name'] as String,
+                  testData['position'] as Position,
+                );
             await Future.delayed(const Duration(milliseconds: 500));
           }
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

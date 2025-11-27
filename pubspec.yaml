@@ -19,6 +19,7 @@ dependencies:
   
   # Gestion d'état
   provider: ^6.1.0
+  flutter_dotenv: ^5.1.0
   
   # Géolocalisation
   geolocator: ^10.1.0
@@ -36,3 +37,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
