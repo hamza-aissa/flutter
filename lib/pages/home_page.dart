@@ -5,6 +5,7 @@ import '../providers/client_provider.dart';
 import '../models/client.dart';
 import '../utils/test_data_generator.dart';
 import 'client_detail_page.dart';
+import 'room_list_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -97,6 +98,19 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Salle d\'attente'),
         actions: [
+          // Room List button
+          IconButton(
+            icon: const Icon(Icons.meeting_room),
+            tooltip: 'Voir les salles',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RoomListScreen(),
+                ),
+              );
+            },
+          ),
           Consumer<ClientProvider>(
             builder: (context, provider, child) {
               return Row(
