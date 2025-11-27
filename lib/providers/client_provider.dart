@@ -233,8 +233,10 @@ class ClientProvider with ChangeNotifier {
   }
   
   /// Disposes of the realtime channel when no longer needed.
+  @override
   void dispose() {
     _clientsChannel?.unsubscribe();
+    super.dispose();
   }
 
   // Charger les waiting rooms depuis SQLite
