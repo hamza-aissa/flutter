@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/client.dart';
 import '../models/waiting_room.dart';
@@ -57,18 +58,41 @@ class SupabaseService {
 
       return response.count;
     } catch (e) {
-      print('Error fetching client count for room $roomId: $e');
+      debugPrint('Error fetching client count for room $roomId: $e');
       return 0;
     }
   }
 
-  /// Fetch client counts for all waiting rooms
+  /// Fetch client counts for all waiting rooms in a single query
   Future<Map<String, int>> fetchAllRoomClientCounts(List<String> roomIds) async {
-    final Map<String, int> counts = {};
-    for (final roomId in roomIds) {
-      counts[roomId] = await fetchClientCountByRoomId(roomId);
+    if (roomIds.isEmpty) {
+      return {};
     }
-    return counts;
+    
+    try {
+      // Use a single query with filter to get all clients
+      final response = await _supabase
+          .from('clients')
+          .select('waiting_room_id')
+          .inFilter('waiting_room_id', roomIds);
+
+      // Count clients per room
+      final Map<String, int> counts = {};
+      for (final roomId in roomIds) {
+        counts[roomId] = 0;
+      }
+      
+      for (final row in response as List) {
+        final roomId = row['waiting_room_id'] as String;
+        counts[roomId] = (counts[roomId] ?? 0) + 1;
+      }
+      
+      return counts;
+    } catch (e) {
+      debugPrint('Error fetching all room client counts: $e');
+      // Fallback: return empty counts for all rooms
+      return {for (final roomId in roomIds) roomId: 0};
+    }
   }
 
   Future<void> addClient(Client client) async {

@@ -149,7 +149,7 @@ class ClientProvider with ChangeNotifier {
   void _handleClientDeleted(Map<String, dynamic> payload) {
     final roomId = payload['waiting_room_id'] as String?;
     if (roomId != null && _roomClientCounts.containsKey(roomId)) {
-      _roomClientCounts[roomId] = (_roomClientCounts[roomId]! - 1).clamp(0, double.infinity).toInt();
+      _roomClientCounts[roomId] = max(0, _roomClientCounts[roomId]! - 1);
       notifyListeners();
     }
     // Also reload clients to reflect the deletion
@@ -163,11 +163,17 @@ class ClientProvider with ChangeNotifier {
   }
 
   /// Dispose realtime subscriptions
-  Future<void> disposeSubscriptions() async {
+  Future<void> _disposeSubscriptions() async {
     if (_clientsChannel != null) {
       await _supabaseService.unsubscribeFromChannel(_clientsChannel!);
       _clientsChannel = null;
     }
+  }
+
+  @override
+  void dispose() {
+    _disposeSubscriptions();
+    super.dispose();
   }
 
   // NOUVELLE MÉTHODE: Créer des salles par défaut
