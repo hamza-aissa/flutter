@@ -136,6 +136,28 @@ class SQLiteService {
     return Client.fromMap(maps.first);
   }
 
+  /// Get the count of clients for a specific waiting room
+  Future<int> getClientCountByRoomId(String roomId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM clients WHERE waiting_room_id = ?',
+      [roomId],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Get clients for a specific waiting room
+  Future<List<Client>> getClientsByRoomId(String roomId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'clients',
+      where: 'waiting_room_id = ?',
+      whereArgs: [roomId],
+      orderBy: 'created_at DESC',
+    );
+    return List.generate(maps.length, (i) => Client.fromMap(maps[i]));
+  }
+
   // Nettoyer toutes les données
   Future<void> clearAllData() async {
     final db = await database;

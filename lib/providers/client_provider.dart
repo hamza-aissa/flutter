@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/client.dart';
 import '../models/waiting_room.dart';
 import '../models/waiting_room_timestamp.dart';
@@ -18,10 +19,24 @@ class ClientProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isOnline = false;
 
+  // Map to store client counts per waiting room (roomId -> count)
+  final Map<String, int> _roomClientCounts = {};
+
+  // Realtime subscription channel
+  RealtimeChannel? _clientsChannel;
+
   List<Client> get clients => _clients;
   List<WaitingRoom> get waitingRooms => _waitingRooms;
   bool get isLoading => _isLoading;
   bool get isOnline => _isOnline;
+
+  /// Get the client count for a specific room
+  int getClientCountForRoom(String roomId) {
+    return _roomClientCounts[roomId] ?? 0;
+  }
+
+  /// Get all room client counts
+  Map<String, int> get roomClientCounts => Map.unmodifiable(_roomClientCounts);
 
   ClientProvider() {
     _init();
@@ -57,10 +72,102 @@ class ClientProvider with ChangeNotifier {
     // Étape 4: Charger les clients
     await loadClients();
     print('👥 ${_clients.length} clients chargés');
+
+    // Étape 5: Refresh client counts for all rooms
+    await _refreshCountsForAllRooms();
+    print('📊 Counts initialized for ${_roomClientCounts.length} rooms');
     
-    // Étape 5: Monitorer connectivité
+    // Étape 6: Monitorer connectivité
     _monitorConnectivity();
     print('🌐 Monitoring de connectivité activé');
+
+    // Étape 7: Setup realtime subscriptions
+    _setupRealtimeSubscriptions();
+    print('📡 Realtime subscriptions activated');
+  }
+
+  /// Refresh client counts for all waiting rooms
+  Future<void> _refreshCountsForAllRooms() async {
+    for (final room in _waitingRooms) {
+      await _fetchCountForRoom(room.id);
+    }
+    notifyListeners();
+  }
+
+  /// Fetch client count for a specific room
+  Future<void> _fetchCountForRoom(String roomId) async {
+    try {
+      // Try to get count from local SQLite first
+      final localCount = await _sqliteService.getClientCountByRoomId(roomId);
+      _roomClientCounts[roomId] = localCount;
+
+      // If online, also fetch from Supabase to stay in sync
+      if (await _syncService.isOnline()) {
+        try {
+          final remoteCount = await _supabaseService.fetchClientCountByRoomId(roomId);
+          _roomClientCounts[roomId] = remoteCount;
+        } catch (e) {
+          print('⚠️ Could not fetch remote count for room $roomId: $e');
+        }
+      }
+    } catch (e) {
+      print('❌ Error fetching count for room $roomId: $e');
+      _roomClientCounts[roomId] = 0;
+    }
+  }
+
+  /// Setup realtime subscriptions for client changes
+  void _setupRealtimeSubscriptions() {
+    _clientsChannel = _supabaseService.subscribeToClientChanges(
+      onInsert: (payload) {
+        print('📡 Realtime: Client inserted');
+        _handleClientInserted(payload);
+      },
+      onDelete: (payload) {
+        print('📡 Realtime: Client deleted');
+        _handleClientDeleted(payload);
+      },
+      onUpdate: (payload) {
+        print('📡 Realtime: Client updated');
+        _handleClientUpdated(payload);
+      },
+    );
+  }
+
+  /// Handle realtime client insert event
+  void _handleClientInserted(Map<String, dynamic> payload) {
+    final roomId = payload['waiting_room_id'] as String?;
+    if (roomId != null) {
+      _roomClientCounts[roomId] = (_roomClientCounts[roomId] ?? 0) + 1;
+      notifyListeners();
+    }
+    // Also reload clients to get the new client
+    loadClients();
+  }
+
+  /// Handle realtime client delete event
+  void _handleClientDeleted(Map<String, dynamic> payload) {
+    final roomId = payload['waiting_room_id'] as String?;
+    if (roomId != null && _roomClientCounts.containsKey(roomId)) {
+      _roomClientCounts[roomId] = (_roomClientCounts[roomId]! - 1).clamp(0, double.infinity).toInt();
+      notifyListeners();
+    }
+    // Also reload clients to reflect the deletion
+    loadClients();
+  }
+
+  /// Handle realtime client update event
+  void _handleClientUpdated(Map<String, dynamic> payload) {
+    // Reload clients to reflect the update
+    loadClients();
+  }
+
+  /// Dispose realtime subscriptions
+  Future<void> disposeSubscriptions() async {
+    if (_clientsChannel != null) {
+      await _supabaseService.unsubscribeFromChannel(_clientsChannel!);
+      _clientsChannel = null;
+    }
   }
 
   // NOUVELLE MÉTHODE: Créer des salles par défaut
@@ -191,6 +298,10 @@ class ClientProvider with ChangeNotifier {
       }
 
       await loadClients();
+      
+      // Refresh count for the affected room
+      await _fetchCountForRoom(closestRoom.id);
+      notifyListeners();
     } catch (e) {
       print('❌ Erreur ajout client: $e');
       rethrow;
@@ -220,6 +331,10 @@ class ClientProvider with ChangeNotifier {
   // Supprimer un client
   Future<void> deleteClient(String id) async {
     try {
+      // Get the client's room ID before deleting
+      final client = await _sqliteService.getClientById(id);
+      final roomId = client?.waitingRoomId;
+
       await _sqliteService.deleteClient(id);
 
       if (await _syncService.isOnline()) {
@@ -231,6 +346,12 @@ class ClientProvider with ChangeNotifier {
       }
 
       await loadClients();
+
+      // Refresh count for the affected room
+      if (roomId != null) {
+        await _fetchCountForRoom(roomId);
+        notifyListeners();
+      }
     } catch (e) {
       print('❌ Erreur suppression client: $e');
       rethrow;
@@ -246,6 +367,9 @@ class ClientProvider with ChangeNotifier {
       final syncedIds = await _syncService.fullSync();
       await loadClients();
       await loadWaitingRooms();
+      
+      // Refresh counts for all rooms after sync
+      await _refreshCountsForAllRooms();
 
       _isLoading = false;
       notifyListeners();

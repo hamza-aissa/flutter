@@ -46,6 +46,31 @@ class SupabaseService {
     }
   }
 
+  /// Fetch the count of clients for a specific waiting room
+  Future<int> fetchClientCountByRoomId(String roomId) async {
+    try {
+      final response = await _supabase
+          .from('clients')
+          .select()
+          .eq('waiting_room_id', roomId)
+          .count(CountOption.exact);
+
+      return response.count;
+    } catch (e) {
+      print('Error fetching client count for room $roomId: $e');
+      return 0;
+    }
+  }
+
+  /// Fetch client counts for all waiting rooms
+  Future<Map<String, int>> fetchAllRoomClientCounts(List<String> roomIds) async {
+    final Map<String, int> counts = {};
+    for (final roomId in roomIds) {
+      counts[roomId] = await fetchClientCountByRoomId(roomId);
+    }
+    return counts;
+  }
+
   Future<void> addClient(Client client) async {
     try {
       await _supabase.from('clients').insert(client.toJson());
@@ -95,5 +120,46 @@ class SupabaseService {
     } catch (e) {
       throw Exception('Erreur lors de l\'ajout de la waiting room: $e');
     }
+  }
+
+  // ========== REALTIME SUBSCRIPTIONS ==========
+
+  /// Subscribe to realtime client changes (INSERT, DELETE, UPDATE)
+  /// Returns a RealtimeChannel that can be used to unsubscribe later
+  RealtimeChannel subscribeToClientChanges({
+    required void Function(Map<String, dynamic> payload) onInsert,
+    required void Function(Map<String, dynamic> payload) onDelete,
+    void Function(Map<String, dynamic> payload)? onUpdate,
+  }) {
+    return _supabase
+        .channel('clients-changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'clients',
+          callback: (payload) => onInsert(payload.newRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'clients',
+          callback: (payload) => onDelete(payload.oldRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'clients',
+          callback: (payload) {
+            if (onUpdate != null) {
+              onUpdate(payload.newRecord);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  /// Unsubscribe from a realtime channel
+  Future<void> unsubscribeFromChannel(RealtimeChannel channel) async {
+    await _supabase.removeChannel(channel);
   }
 }
